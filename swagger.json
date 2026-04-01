@@ -1,0 +1,459 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "BuildBoard API",
+    "description": "Internal Innovation Portal with Rewards & Bidding System",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "https://build-board-backend.vercel.app", "description": "Production" },
+    { "url": "http://localhost:3000", "description": "Local" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "email": { "type": "string" },
+          "fullName": { "type": "string" },
+          "avatarUrl": { "type": "string", "nullable": true },
+          "role": { "type": "string", "enum": ["employee", "manager", "hr", "admin"] },
+          "department": { "type": "string", "nullable": true },
+          "totalPoints": { "type": "integer" }
+        }
+      },
+      "Idea": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "category": { "type": "string" },
+          "project_type": { "type": "string", "enum": ["poc", "product"] },
+          "size": { "type": "string", "enum": ["micro", "small", "medium", "large", "xl", "enterprise"] },
+          "complexity": { "type": "string", "enum": ["low", "medium", "high", "innovative"] },
+          "status": { "type": "string", "enum": ["draft", "pending", "approved", "bidding_closed", "assigned", "in_progress", "completed", "archived", "rejected"] },
+          "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+          "submitted_by": { "type": "string", "format": "uuid" },
+          "approved_by": { "type": "string", "format": "uuid", "nullable": true },
+          "project_owner": { "type": "string", "format": "uuid", "nullable": true },
+          "estimated_hours": { "type": "number", "nullable": true },
+          "actual_hours": { "type": "number", "nullable": true },
+          "points_reward": { "type": "integer" },
+          "bid_cutoff_date": { "type": "string", "format": "date-time", "nullable": true },
+          "expected_delivery_date": { "type": "string", "format": "date-time", "nullable": true },
+          "completed_at": { "type": "string", "format": "date-time", "nullable": true },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Bid": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "idea_id": { "type": "string", "format": "uuid" },
+          "user_id": { "type": "string", "format": "uuid" },
+          "bid_type": { "type": "string", "enum": ["solo", "team"] },
+          "lead_user_id": { "type": "string", "format": "uuid", "nullable": true },
+          "proposed_hours": { "type": "number" },
+          "approach_note": { "type": "string", "nullable": true },
+          "committed_date": { "type": "string", "format": "date-time", "nullable": true },
+          "status": { "type": "string", "enum": ["pending", "assigned", "rejected"] },
+          "teamMembers": { "type": "array", "nullable": true, "items": { "$ref": "#/components/schemas/TeamMember" } }
+        }
+      },
+      "TeamMember": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "user_id": { "type": "string", "format": "uuid" },
+          "confirmed": { "type": "boolean" }
+        }
+      },
+      "TimeLog": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "idea_id": { "type": "string", "format": "uuid" },
+          "user_id": { "type": "string", "format": "uuid" },
+          "hours": { "type": "number" },
+          "description": { "type": "string", "nullable": true },
+          "logged_date": { "type": "string", "format": "date" }
+        }
+      },
+      "Comment": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "idea_id": { "type": "string", "format": "uuid" },
+          "user_id": { "type": "string", "format": "uuid" },
+          "content": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Feedback": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "idea_id": { "type": "string", "format": "uuid" },
+          "user_id": { "type": "string", "format": "uuid" },
+          "rating": { "type": "string", "enum": ["poor", "average", "good", "excellent"] },
+          "comment": { "type": "string", "nullable": true }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Google login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["idToken"],
+                "properties": { "idToken": { "type": "string", "description": "Google OAuth ID token" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "JWT token + user info" },
+          "401": { "description": "Auth failed / domain not allowed" }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get current user",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Current user profile" } }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "List all users (admin only)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Array of users" } }
+      }
+    },
+    "/api/users/{id}/role": {
+      "patch": {
+        "tags": ["Users"],
+        "summary": "Update user role (admin only)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "role": { "type": "string", "enum": ["employee", "manager", "hr", "admin"] } } }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated user" } }
+      }
+    },
+    "/api/users/{id}/points": {
+      "get": {
+        "tags": ["Points & Rewards"],
+        "summary": "Get user points",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "User points" } }
+      }
+    },
+    "/api/ideas": {
+      "get": {
+        "tags": ["Ideas"],
+        "summary": "List ideas with filters",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "category", "in": "query", "schema": { "type": "string" } },
+          { "name": "priority", "in": "query", "schema": { "type": "string" } },
+          { "name": "projectType", "in": "query", "schema": { "type": "string" } },
+          { "name": "submittedBy", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Array of ideas" } }
+      },
+      "post": {
+        "tags": ["Ideas"],
+        "summary": "Submit a new idea",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "description"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "category": { "type": "string" },
+                  "projectType": { "type": "string", "enum": ["poc", "product"] },
+                  "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+                  "estimatedHours": { "type": "number" },
+                  "projectOwner": { "type": "string", "format": "uuid" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created idea" } }
+      }
+    },
+    "/api/ideas/{id}": {
+      "get": {
+        "tags": ["Ideas"],
+        "summary": "Get idea by ID",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Idea details" } }
+      }
+    },
+    "/api/ideas/{id}/approve": {
+      "patch": {
+        "tags": ["Ideas"],
+        "summary": "Approve idea (manager/admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["size", "complexity", "bidCutoffDate", "expectedDeliveryDate"],
+                "properties": {
+                  "size": { "type": "string", "enum": ["micro", "small", "medium", "large", "xl", "enterprise"] },
+                  "complexity": { "type": "string", "enum": ["low", "medium", "high", "innovative"] },
+                  "bidCutoffDate": { "type": "string", "format": "date-time" },
+                  "expectedDeliveryDate": { "type": "string", "format": "date-time" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Approved idea" } }
+      }
+    },
+    "/api/ideas/{id}/reject": {
+      "patch": {
+        "tags": ["Ideas"],
+        "summary": "Reject idea (manager/admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Rejected idea" } }
+      }
+    },
+    "/api/ideas/{id}/complete": {
+      "patch": {
+        "tags": ["Ideas"],
+        "summary": "Mark idea as completed",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Completed idea" } }
+      }
+    },
+    "/api/ideas/{ideaId}/bids": {
+      "post": {
+        "tags": ["Bids"],
+        "summary": "Place a bid (solo or team)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "ideaId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["proposedHours", "bidType"],
+                "properties": {
+                  "proposedHours": { "type": "number" },
+                  "approachNote": { "type": "string" },
+                  "committedDate": { "type": "string", "format": "date-time" },
+                  "bidType": { "type": "string", "enum": ["solo", "team"] },
+                  "leadUserId": { "type": "string", "format": "uuid" },
+                  "teamMemberIds": { "type": "array", "items": { "type": "string", "format": "uuid" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created bid" } }
+      },
+      "get": {
+        "tags": ["Bids"],
+        "summary": "Get bids for an idea",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "ideaId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Array of bids" } }
+      }
+    },
+    "/api/bids/{id}/assign": {
+      "patch": {
+        "tags": ["Bids"],
+        "summary": "Assign a bid (manager/admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Assigned bid" } }
+      }
+    },
+    "/api/ideas/{ideaId}/timelogs": {
+      "post": {
+        "tags": ["Time Logs"],
+        "summary": "Log time on an idea",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "ideaId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["hours", "loggedDate"],
+                "properties": {
+                  "hours": { "type": "number" },
+                  "description": { "type": "string" },
+                  "loggedDate": { "type": "string", "format": "date" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created time log" } }
+      },
+      "get": {
+        "tags": ["Time Logs"],
+        "summary": "Get time logs for an idea",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "ideaId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Array of time logs" } }
+      }
+    },
+    "/api/ideas/{ideaId}/comments": {
+      "post": {
+        "tags": ["Comments"],
+        "summary": "Add a comment",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "ideaId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["content"],
+                "properties": { "content": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created comment" } }
+      },
+      "get": {
+        "tags": ["Comments"],
+        "summary": "Get comments for an idea",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "ideaId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Array of comments" } }
+      }
+    },
+    "/api/ideas/{ideaId}/feedback": {
+      "post": {
+        "tags": ["Feedback"],
+        "summary": "Submit feedback (triggers points calculation)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "ideaId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["rating"],
+                "properties": {
+                  "rating": { "type": "string", "enum": ["poor", "average", "good", "excellent"] },
+                  "comment": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created feedback + points awarded" } }
+      }
+    },
+    "/api/ideas/{ideaId}/members": {
+      "get": {
+        "tags": ["Members"],
+        "summary": "Get idea members (access controlled)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "ideaId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Array of members" } }
+      }
+    },
+    "/api/milestones/ready": {
+      "get": {
+        "tags": ["Points & Rewards"],
+        "summary": "Get unclaimed milestones (hr/admin)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Array of unclaimed milestones" } }
+      }
+    },
+    "/api/analytics/overview": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Portal overview stats",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Overview with counts, hours, POC/Product ratio" } }
+      }
+    },
+    "/api/analytics/hours": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Hours analytics (estimated vs actual)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Array of idea hours data" } }
+      }
+    },
+    "/api/analytics/leaderboard": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Leaderboard by points",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Array of users sorted by points" } }
+      }
+    },
+    "/api/analytics/delivery-health": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Delivery health stats (manager/admin)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "On-time, early, late counts and percentage" } }
+      }
+    },
+    "/api/analytics/employee-hours": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Employee hours tracking (manager/admin)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Per-employee weekly/monthly/all-time hours" } }
+      }
+    }
+  }
+}

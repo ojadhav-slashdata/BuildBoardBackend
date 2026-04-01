@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const swaggerDoc = require('./swagger.json');
 
 const authRoutes = require('./routes/auth');
 const ideasRoutes = require('./routes/ideas');
@@ -30,7 +32,8 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api', pointsRoutes);
 app.use('/api/bids', require('./routes/bidActions'));
 
-app.get('/', (req, res) => res.json({ status: 'BuildBoard API running' }));
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc));
+app.get('/', (req, res) => res.json({ status: 'BuildBoard API running', docs: '/docs' }));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
