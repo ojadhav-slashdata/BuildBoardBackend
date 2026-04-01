@@ -15,10 +15,15 @@ const usersRoutes = require('./routes/users');
 const analyticsRoutes = require('./routes/analytics');
 const pointsRoutes = require('./routes/points');
 
+const { runMigrations, getMigrationSQL } = require('./migrate');
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Run migrations on startup
+runMigrations().catch(err => console.error('[migrate] Failed:', err.message));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/ideas', ideasRoutes);
@@ -41,6 +46,17 @@ const swaggerOptions = {
 };
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc, swaggerOptions));
 app.get('/api/swagger.json', (req, res) => res.json(swaggerDoc));
+
+// Migration endpoints
+app.get('/api/migrate/status', async (req, res) => {
+  const status = await runMigrations();
+  res.json(status);
+});
+
+app.get('/api/migrate/sql', (req, res) => {
+  res.type('text/plain').send(getMigrationSQL());
+});
+
 app.get('/', (req, res) => res.json({ status: 'BuildBoard API running', docs: '/docs' }));
 
 const PORT = process.env.PORT || 3000;
