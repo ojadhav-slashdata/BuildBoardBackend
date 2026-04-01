@@ -32,7 +32,15 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api', pointsRoutes);
 app.use('/api/bids', require('./routes/bidActions'));
 
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc));
+const swaggerOptions = {
+  customCssUrl: 'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css',
+  customJs: [
+    'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js',
+    'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js'
+  ]
+};
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc, swaggerOptions));
+app.get('/api/swagger.json', (req, res) => res.json(swaggerDoc));
 app.get('/', (req, res) => res.json({ status: 'BuildBoard API running', docs: '/docs' }));
 
 const PORT = process.env.PORT || 3000;
