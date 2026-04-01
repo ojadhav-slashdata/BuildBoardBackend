@@ -119,7 +119,7 @@ router.post('/', authenticate, async (req, res) => {
 
 // PATCH /ideas/:id/approve
 router.patch('/:id/approve', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
-  const { size, complexity, bidCutoffDate, expectedDeliveryDate } = req.body;
+  const { size, complexity, bidCutoffDate, expectedDeliveryDate, estimatedHours, projectType } = req.body;
 
   const { data: existing } = await supabase.from('ideas').select('submitted_by').eq('id', req.params.id).single();
   if (!existing) return res.status(404).json({ error: 'Idea not found' });
@@ -131,6 +131,8 @@ router.patch('/:id/approve', authenticate, requireRole('Manager', 'Admin'), asyn
     complexity: complexity || 'Low',
     bid_cutoff_date: bidCutoffDate,
     expected_delivery_date: expectedDeliveryDate,
+    estimated_hours: estimatedHours || null,
+    ...(projectType !== undefined && { project_type: projectType }),
     updated_at: new Date().toISOString()
   }).eq('id', req.params.id).select().single();
 
