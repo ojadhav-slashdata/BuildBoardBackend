@@ -51,8 +51,8 @@ router.get('/me', authenticate, async (req, res) => {
   });
 });
 
-// GET /users — all users (admin)
-router.get('/', authenticate, requireRole('Admin'), async (req, res) => {
+// GET /users — all users (any authenticated user, for owner search)
+router.get('/', authenticate, async (req, res) => {
   const { data, error } = await supabase.from('users')
     .select('*').order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
