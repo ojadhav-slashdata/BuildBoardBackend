@@ -89,4 +89,93 @@ router.patch('/:id/decline', authenticate, async (req, res) => {
   res.json({ status: 'Declined' });
 });
 
+const { autoAssignBid, checkAndAutoAssign, calculatePerformanceScore } = require('../services/bidAutoAssign');
+
+// POST /bids/auto-assign/:ideaId — manually trigger auto-assign for an idea
+router.post('/auto-assign/:ideaId', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
+  const result = await autoAssignBid(req.params.ideaId);
+  if (!result) return res.status(400).json({ error: 'No eligible bids or idea not in BiddingOpen status' });
+  res.json(result);
+});
+
+// POST /bids/check-cutoffs — check all ideas past cutoff and auto-assign
+router.post('/check-cutoffs', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
+  const results = await checkAndAutoAssign();
+  res.json({ assigned: results.length, results });
+});
+
+// GET /bids/results/:ideaId — get bid results with scores and winner
+router.get('/results/:ideaId', authenticate, async (req, res) => {
+  const { data: idea } = await supabase.from('ideas')
+    .select('*').eq('id', req.params.ideaId).single();
+  if (!idea) return res.status(404).json({ error: 'Idea not found' });
+
+  const { data: bids } = await supabase.from('bids')
+    .select('*').eq('idea_id', req.params.ideaId).order('performance_score', { ascending: false });
+
+  const result = [];
+  for (const bid of (bids || [])) {
+    const { data: user } = await supabase.from('users')
+      .select('full_name, avatar_url').eq('id', bid.user_id).single();
+
+    let teamMembers = [];
+    if (bid.bid_type === 'team') {
+      const { data: tm } = await supabase.from('team_members')
+        .select('user_id, confirmed').eq('bid_id', bid.id);
+      for (const t of (tm || [])) {
+        const { data: tmUser } = await supabase.from('users')
+          .select('full_name').eq('id', t.user_id).single();
+        teamMembers.push({ userId: t.user_id, name: tmUser?.full_name, confirmed: t.confirmed });
+      }
+    }
+
+    // Calculate why this bid won/lost
+    const isWinner = bid.status === 'Won';
+    const isWithinDeadline = bid.committed_date && idea.expected_delivery_date
+      ? new Date(bid.committed_date) <= new Date(idea.expected_delivery_date) : true;
+    const daysVsExpected = bid.committed_date && idea.expected_delivery_date
+      ? Math.round((new Date(idea.expected_delivery_date) - new Date(bid.committed_date)) / (1000*60*60*24)) : 0;
+
+    result.push({
+      id: bid.id,
+      bidder: user?.full_name || bid.bidder_name || 'Unknown',
+      bidderAvatar: user?.avatar_url,
+      mode: bid.bid_type,
+      committedDate: bid.committed_date,
+      approach: bid.approach_note,
+      score: bid.performance_score || 0,
+      status: bid.status,
+      isWinner,
+      isWithinDeadline,
+      daysVsExpected,
+      isAutoAssigned: bid.is_auto_assigned || idea.auto_assigned,
+      teamMembers,
+      reasons: isWinner ? [
+        `Highest performance score: ${bid.performance_score}/100`,
+        isWithinDeadline ? `Delivery ${daysVsExpected} days before deadline` : 'Committed to deliver on time',
+        bid.bid_type === 'team' ? 'Team bid with confirmed members' : 'Solo bid — full commitment'
+      ] : [
+        `Performance score: ${bid.performance_score}/100`,
+        !isWithinDeadline ? 'Delivery date exceeds expected deadline' : null,
+        bid.performance_score < (result[0]?.score || 0) ? 'Lower score than winning bid' : null
+      ].filter(Boolean)
+    });
+  }
+
+  res.json({
+    idea: {
+      id: idea.id,
+      title: idea.title,
+      status: idea.status,
+      expectedDeliveryDate: idea.expected_delivery_date,
+      bidCutoffDate: idea.bid_cutoff_date,
+      size: idea.size,
+      complexity: idea.complexity,
+      autoAssigned: idea.auto_assigned
+    },
+    bids: result,
+    winner: result.find(b => b.isWinner) || null
+  });
+});
+
 module.exports = router;

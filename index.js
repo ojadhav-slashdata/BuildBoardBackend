@@ -25,6 +25,17 @@ app.use(express.json());
 // Run migrations on startup
 runMigrations().catch(err => console.error('[migrate] Failed:', err.message));
 
+// Check bid cutoffs every 5 minutes
+const { checkAndAutoAssign } = require('./services/bidAutoAssign');
+setInterval(async () => {
+  try {
+    const results = await checkAndAutoAssign();
+    if (results.length > 0) console.log(`[auto-assign] Assigned ${results.length} idea(s)`);
+  } catch (err) {
+    console.error('[auto-assign] Error:', err.message);
+  }
+}, 5 * 60 * 1000);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/ideas', ideasRoutes);
 app.use('/api/ideas', bidsRoutes);
