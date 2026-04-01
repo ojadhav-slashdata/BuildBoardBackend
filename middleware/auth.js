@@ -50,8 +50,8 @@ async function authenticate(req, res, next) {
         }
       } else {
         // Create new user
-        const superAdmin = process.env.SUPER_ADMIN_EMAIL;
-        const role = email.toLowerCase() === superAdmin?.toLowerCase() ? 'Admin' : 'Employee';
+        const superAdmins = (process.env.SUPER_ADMIN_EMAIL || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+        const role = superAdmins.includes(email.toLowerCase()) ? 'Admin' : 'Employee';
 
         const { data: newUser, error } = await supabase.from('users').insert({
           email,
