@@ -16,8 +16,8 @@ router.get('/overview', authenticate, async (req, res) => {
   });
 });
 
-// GET /analytics/dashboard — full analytics (Manager/Admin)
-router.get('/dashboard', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
+// GET /analytics/dashboard — full analytics (all authenticated users)
+router.get('/dashboard', authenticate, async (req, res) => {
   const { data: ideas } = await supabase.from('ideas').select('*');
   const { data: bids } = await supabase.from('bids').select('bid_type, status');
   const { data: timeLogs } = await supabase.from('time_logs').select('hours, created_at');
@@ -91,6 +91,56 @@ router.get('/dashboard', authenticate, requireRole('Manager', 'Admin'), async (r
     lateDeliveries: late.length,
     leaderboard: (users || []).slice(0, 10).map(u => ({ name: u.full_name, points: u.total_points }))
   });
+});
+
+// GET /analytics/activity — recent activity feed
+router.get('/activity', authenticate, async (req, res) => {
+  const activities = [];
+
+  // Get recently completed ideas
+  const { data: completedIdeas } = await supabase.from('ideas')
+    .select('title, completed_at, submitted_by').eq('status', 'Completed')
+    .order('completed_at', { ascending: false }).limit(3);
+
+  for (const idea of (completedIdeas || [])) {
+    const { data: user } = await supabase.from('users').select('full_name').eq('id', idea.submitted_by).single();
+    activities.push({
+      type: 'completed',
+      text: `${idea.title} marked complete by ${user?.full_name || 'Unknown'}`,
+      time: idea.completed_at
+    });
+  }
+
+  // Get recently approved ideas
+  const { data: approvedIdeas } = await supabase.from('ideas')
+    .select('title, updated_at').eq('status', 'BiddingOpen')
+    .order('updated_at', { ascending: false }).limit(3);
+
+  for (const idea of (approvedIdeas || [])) {
+    activities.push({
+      type: 'approved',
+      text: `${idea.title} approved and open for bidding`,
+      time: idea.updated_at
+    });
+  }
+
+  // Get recent bids
+  const { data: recentBids } = await supabase.from('bids')
+    .select('idea_id, user_id, created_at, bid_type').order('created_at', { ascending: false }).limit(3);
+
+  for (const bid of (recentBids || [])) {
+    const { data: user } = await supabase.from('users').select('full_name').eq('id', bid.user_id).single();
+    const { data: idea } = await supabase.from('ideas').select('title').eq('id', bid.idea_id).single();
+    activities.push({
+      type: 'bid',
+      text: `${user?.full_name || 'Someone'} placed a ${bid.bid_type} bid on ${idea?.title || 'an idea'}`,
+      time: bid.created_at
+    });
+  }
+
+  // Sort by time descending
+  activities.sort((a, b) => new Date(b.time) - new Date(a.time));
+  res.json(activities.slice(0, 10));
 });
 
 module.exports = router;
