@@ -1,14 +1,17 @@
 const supabase = require('../db');
 
 const BASE_POINTS = {
+  Micro: 10, Small: 25, Medium: 50, Large: 100, XL: 200, Enterprise: 400,
   micro: 10, small: 25, medium: 50, large: 100, xl: 200, enterprise: 400
 };
 
 const COMPLEXITY_BONUS = {
+  Low: 0, Medium: 20, High: 50, Innovative: 100,
   low: 0, medium: 20, high: 50, innovative: 100
 };
 
 const FEEDBACK_POINTS = {
+  Excellent: 50, Good: 25, Average: 10, Poor: 0,
   excellent: 50, good: 25, average: 10, poor: 0
 };
 
@@ -42,7 +45,7 @@ async function awardPoints(ideaId, feedbackRating) {
   const { data: idea } = await supabase.from('ideas').select('*').eq('id', ideaId).single();
   if (!idea) return;
 
-  const { data: bids } = await supabase.from('bids').select('*').eq('idea_id', ideaId).eq('status', 'assigned');
+  const { data: bids } = await supabase.from('bids').select('*').eq('idea_id', ideaId).in('status', ['assigned', 'Won']);
   const assignedBid = bids?.[0];
   if (!assignedBid) return;
 
