@@ -70,6 +70,13 @@ async function authenticate(req, res, next) {
       }
     }
 
+    // Auto-promote super admins on every login (in case they were created before env var was set)
+    const superAdmins = (process.env.SUPER_ADMIN_EMAIL || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    if (superAdmins.includes(user.email.toLowerCase()) && user.role !== 'Admin') {
+      await supabase.from('users').update({ role: 'Admin' }).eq('id', user.id);
+      user.role = 'Admin';
+    }
+
     req.user = {
       userId: user.id,
       email: user.email,
