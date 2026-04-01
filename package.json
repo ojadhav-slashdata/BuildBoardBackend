@@ -1,0 +1,18 @@
+{
+  "name": "buildboard-api",
+  "version": "1.0.0",
+  "description": "BuildBoard Innovation Portal API",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node index.js",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "google-auth-library": "^10.6.2",
+    "jsonwebtoken": "^9.0.3"
+  }
+}
