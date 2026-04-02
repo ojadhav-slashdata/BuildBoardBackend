@@ -2,6 +2,7 @@ const express = require('express');
 const supabase = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { calculatePerformanceScore } = require('../services/bidAutoAssign');
+const { notify } = require('../services/notify');
 
 const router = express.Router();
 
@@ -52,6 +53,9 @@ router.post('/:ideaId/bids', authenticate, async (req, res) => {
   }).select().single();
 
   if (error) return res.status(500).json({ error: error.message });
+
+  // Notify idea owner
+  await notify(idea.submitted_by, 'New Bid Received', `${req.user.name} placed a ${mode || 'solo'} bid on your idea "${idea.title}".`, 'bid', ideaId);
 
   // Insert team members if team bid
   let teamMembersList = [];

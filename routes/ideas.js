@@ -2,6 +2,7 @@ const express = require('express');
 const supabase = require('../db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { awardIdeaSubmissionPoints } = require('../services/points');
+const { notify } = require('../services/notify');
 
 const router = express.Router();
 
@@ -144,6 +145,7 @@ router.patch('/:id/approve', authenticate, requireRole('Manager', 'Admin'), asyn
   if (error) return res.status(500).json({ error: error.message });
 
   await awardIdeaSubmissionPoints(existing.submitted_by);
+  await notify(existing.submitted_by, 'Idea Approved!', `Your idea "${data.title}" has been approved and is now open for bidding.`, 'approval', req.params.id);
   res.json(mapIdeaToResponse(data));
 });
 
@@ -158,6 +160,7 @@ router.patch('/:id/reject', authenticate, requireRole('Manager', 'Admin'), async
   }).eq('id', req.params.id).select().single();
 
   if (error) return res.status(500).json({ error: error.message });
+  await notify(data.submitted_by, 'Idea Not Approved', `Your idea "${data.title}" was not approved. ${comment ? 'Reason: ' + comment : 'Check with your manager for details.'}`, 'warning', req.params.id);
   res.json(mapIdeaToResponse(data));
 });
 

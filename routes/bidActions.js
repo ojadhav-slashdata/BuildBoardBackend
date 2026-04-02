@@ -1,6 +1,7 @@
 const express = require('express');
 const supabase = require('../db');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { notify, notifyMultiple } = require('../services/notify');
 
 const router = express.Router();
 
@@ -151,6 +152,23 @@ router.patch('/:id/assign', authenticate, requireRole('Manager', 'Admin'), async
     await supabase.from('idea_members').insert({
       idea_id: bid.idea_id, user_id: memberId, role: 'contributor'
     });
+  }
+
+  const { data: idea } = await supabase.from('ideas').select('title').eq('id', bid.idea_id).single();
+
+  // Notify winner
+  await notify(bid.user_id, 'You Won the Bid!', `Your bid on "${idea?.title || 'an idea'}" has been selected. Time to build!`, 'assignment', bid.idea_id);
+
+  // Notify other bidders
+  const { data: otherBids } = await supabase.from('bids')
+    .select('user_id').eq('idea_id', bid.idea_id).neq('id', req.params.id);
+  if (otherBids?.length) {
+    await notifyMultiple(
+      otherBids.map(b => b.user_id),
+      'Bid Not Selected',
+      `Another bid was selected for "${idea?.title || 'an idea'}". Keep bidding on other ideas!`,
+      'info', bid.idea_id
+    );
   }
 
   res.json({ ...bid, status: 'Won' });
