@@ -92,7 +92,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
 // POST /ideas — create
 router.post('/', authenticate, async (req, res) => {
-  const { title, description, category, projectType, projectOwner } = req.body;
+  const { title, description, category, projectType, projectOwner, businessValue, resources, challenges } = req.body;
   const userId = req.user.userId;
 
   const { data: idea, error } = await supabase.from('ideas').insert({
@@ -102,6 +102,9 @@ router.post('/', authenticate, async (req, res) => {
     project_type: projectType || 'POC',
     priority: 'medium',
     project_owner_name: projectOwner || null,
+    business_value: businessValue || null,
+    resources: resources || null,
+    challenges: challenges || null,
     submitted_by: userId,
     status: 'PendingApproval',
     size: 'Micro',
@@ -146,9 +149,11 @@ router.patch('/:id/approve', authenticate, requireRole('Manager', 'Admin'), asyn
 
 // PATCH /ideas/:id/reject
 router.patch('/:id/reject', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
+  const { comment } = req.body;
   const { data, error } = await supabase.from('ideas').update({
     status: 'Rejected',
     approved_by: req.user.userId,
+    rejection_comment: comment || null,
     updated_at: new Date().toISOString()
   }).eq('id', req.params.id).select().single();
 
@@ -191,7 +196,11 @@ function mapIdeaToResponse(idea) {
     expectedDeliveryDate: idea.expected_delivery_date,
     completedAt: idea.completed_at,
     createdAt: idea.created_at,
-    updatedAt: idea.updated_at
+    updatedAt: idea.updated_at,
+    businessValue: idea.business_value,
+    resources: idea.resources,
+    challenges: idea.challenges,
+    rejectionComment: idea.rejection_comment
   };
 }
 

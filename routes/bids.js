@@ -64,7 +64,17 @@ router.get('/:ideaId/bids', authenticate, async (req, res) => {
     });
   }
 
-  res.json(result);
+  // Get idea for cutoff info
+  const { data: idea } = await supabase.from('ideas')
+    .select('bid_cutoff_date, expected_delivery_date, title').eq('id', req.params.ideaId).single();
+
+  res.json({
+    bids: result,
+    cutoffDate: idea?.bid_cutoff_date || null,
+    expectedDeliveryDate: idea?.expected_delivery_date || null,
+    ideaTitle: idea?.title || '',
+    timeRemaining: idea?.bid_cutoff_date ? Math.max(0, new Date(idea.bid_cutoff_date) - new Date()) : null
+  });
 });
 
 function mapBidToResponse(bid) {
