@@ -23,8 +23,11 @@ router.post('/:ideaId/bids', authenticate, async (req, res) => {
   }
 
   // Validation 2: Check bid deadline hasn't passed
-  if (idea.bid_cutoff_date && new Date(idea.bid_cutoff_date) < new Date()) {
-    return res.status(400).json({ error: 'Bidding deadline has passed', cutoffDate: idea.bid_cutoff_date });
+  if (idea.bid_cutoff_date) {
+    const cutoffTime = new Date(idea.bid_cutoff_date).getTime();
+    if (cutoffTime > 0 && cutoffTime < Date.now()) {
+      return res.status(400).json({ error: 'Bidding deadline has passed', cutoffDate: idea.bid_cutoff_date });
+    }
   }
 
   // Validation 3: Check user hasn't already bid on this idea
