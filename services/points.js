@@ -67,6 +67,18 @@ async function awardPoints(ideaId, feedbackRating) {
     if (!user) continue;
     const newTotal = user.total_points + pointsPerMember;
     await supabase.from('users').update({ total_points: newTotal }).eq('id', userId);
+    // Create point batch for expiry tracking
+    await supabase.from('point_batches').insert({
+      user_id: userId,
+      points: pointsPerMember,
+      remaining: pointsPerMember,
+      source: idea.title,
+      idea_id: ideaId,
+      earned_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+    });
+    // Update redeemable points
+    await supabase.from('users').update({ redeemable_points: newTotal }).eq('id', userId);
     await checkMilestones(userId, newTotal);
   }
 
@@ -78,6 +90,15 @@ async function awardIdeaSubmissionPoints(userId) {
   if (!user) return;
   const newTotal = user.total_points + 5;
   await supabase.from('users').update({ total_points: newTotal }).eq('id', userId);
+  await supabase.from('point_batches').insert({
+    user_id: userId,
+    points: 5,
+    remaining: 5,
+    source: 'Idea submission bonus',
+    earned_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+  });
+  await supabase.from('users').update({ redeemable_points: newTotal }).eq('id', userId);
   await checkMilestones(userId, newTotal);
 }
 

@@ -14,6 +14,7 @@ const membersRoutes = require('./routes/members');
 const usersRoutes = require('./routes/users');
 const analyticsRoutes = require('./routes/analytics');
 const pointsRoutes = require('./routes/points');
+const rewardsRoutes = require('./routes/rewards');
 
 const { runMigrations, getMigrationSQL } = require('./migrate');
 
@@ -46,6 +47,7 @@ app.use('/api/ideas', membersRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api', pointsRoutes);
+app.use('/api/rewards', rewardsRoutes);
 app.use('/api/bids', require('./routes/bidActions'));
 
 const swaggerOptions = {
