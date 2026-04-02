@@ -93,7 +93,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
 // POST /ideas — create
 router.post('/', authenticate, async (req, res) => {
-  const { title, description, category, projectType, projectOwner, businessValue, resources, challenges } = req.body;
+  const { title, description, category, projectType, projectOwner, businessValue, resources, challenges, attachment, attachmentName } = req.body;
   const userId = req.user.userId;
 
   const { data: idea, error } = await supabase.from('ideas').insert({
@@ -106,6 +106,8 @@ router.post('/', authenticate, async (req, res) => {
     business_value: businessValue || null,
     resources: resources || null,
     challenges: challenges || null,
+    attachment_url: attachment || null,
+    attachment_name: attachmentName || null,
     submitted_by: userId,
     status: 'PendingApproval',
     size: 'Micro',
@@ -203,7 +205,9 @@ function mapIdeaToResponse(idea) {
     businessValue: idea.business_value,
     resources: idea.resources,
     challenges: idea.challenges,
-    rejectionComment: idea.rejection_comment
+    rejectionComment: idea.rejection_comment,
+    attachmentUrl: idea.attachment_url,
+    attachmentName: idea.attachment_name
   };
 }
 
