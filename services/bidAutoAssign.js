@@ -50,7 +50,11 @@ async function autoAssignBid(ideaId) {
   const { data: bids } = await supabase.from('bids')
     .select('*').eq('idea_id', ideaId).eq('status', 'Pending');
 
-  if (!bids || bids.length === 0) return null;
+  if (!bids || bids.length === 0) {
+    // No bids received — mark as Expired
+    await supabase.from('ideas').update({ status: 'Expired', updated_at: new Date().toISOString() }).eq('id', ideaId);
+    return { status: 'Expired', reason: 'No bids received before cutoff' };
+  }
 
   // Calculate scores for all bids
   const scoredBids = [];
