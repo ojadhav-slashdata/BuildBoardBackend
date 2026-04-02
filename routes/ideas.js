@@ -124,7 +124,7 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // PATCH /ideas/:id/approve
-router.patch('/:id/approve', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
+router.patch('/:id/approve', authenticate, requireRole('Admin'), async (req, res) => {
   const { size, complexity, bidCutoffDate, expectedDeliveryDate, estimatedHours, projectType, minHours, maxHours } = req.body;
 
   const { data: existing } = await supabase.from('ideas').select('submitted_by').eq('id', req.params.id).single();
@@ -152,7 +152,7 @@ router.patch('/:id/approve', authenticate, requireRole('Manager', 'Admin'), asyn
 });
 
 // PATCH /ideas/:id/reject
-router.patch('/:id/reject', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
+router.patch('/:id/reject', authenticate, requireRole('Admin'), async (req, res) => {
   const { comment } = req.body;
   const { data, error } = await supabase.from('ideas').update({
     status: 'Rejected',

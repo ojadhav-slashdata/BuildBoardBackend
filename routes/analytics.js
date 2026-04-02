@@ -144,7 +144,7 @@ router.get('/activity', authenticate, async (req, res) => {
 });
 
 // GET /analytics/executive — CEO/Executive innovation dashboard
-router.get('/executive', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
+router.get('/executive', authenticate, requireRole('Admin'), async (req, res) => {
   const { data: ideas } = await supabase.from('ideas').select('*');
   const { data: users } = await supabase.from('users').select('*');
   const { data: timeLogs } = await supabase.from('time_logs').select('*');

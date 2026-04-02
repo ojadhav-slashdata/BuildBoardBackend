@@ -6,7 +6,7 @@ const { notify, notifyMultiple } = require('../services/notify');
 const router = express.Router();
 
 // GET /bids/dashboard — Manager's bid dashboard across all ideas
-router.get('/dashboard', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
+router.get('/dashboard', authenticate, requireRole('Admin'), async (req, res) => {
   try {
   // Get all ideas that have bids or are in bidding
   const { data: ideas, error: ideasErr } = await supabase.from('ideas')
@@ -119,7 +119,7 @@ router.get('/mine', authenticate, async (req, res) => {
 });
 
 // PATCH /bids/:id/assign
-router.patch('/:id/assign', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
+router.patch('/:id/assign', authenticate, requireRole('Admin'), async (req, res) => {
   const { data: bid } = await supabase.from('bids').select('*').eq('id', req.params.id).single();
   if (!bid) return res.status(404).json({ error: 'Bid not found' });
 
@@ -195,14 +195,14 @@ router.patch('/:id/decline', authenticate, async (req, res) => {
 const { autoAssignBid, checkAndAutoAssign, calculatePerformanceScore } = require('../services/bidAutoAssign');
 
 // POST /bids/auto-assign/:ideaId — manually trigger auto-assign for an idea
-router.post('/auto-assign/:ideaId', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
+router.post('/auto-assign/:ideaId', authenticate, requireRole('Admin'), async (req, res) => {
   const result = await autoAssignBid(req.params.ideaId);
   if (!result) return res.status(400).json({ error: 'No eligible bids or idea not in BiddingOpen status' });
   res.json(result);
 });
 
 // POST /bids/check-cutoffs — check all ideas past cutoff and auto-assign
-router.post('/check-cutoffs', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
+router.post('/check-cutoffs', authenticate, requireRole('Admin'), async (req, res) => {
   const results = await checkAndAutoAssign();
   res.json({ assigned: results.length, results });
 });
