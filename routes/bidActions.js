@@ -4,6 +4,85 @@ const { authenticate, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
+// GET /bids/dashboard — Manager's bid dashboard across all ideas
+router.get('/dashboard', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
+  // Get all ideas that have bids or are in bidding
+  const { data: ideas } = await supabase.from('ideas')
+    .select('*')
+    .in('status', ['BiddingOpen', 'BiddingClosed', 'InProgress', 'Completed'])
+    .order('updated_at', { ascending: false });
+
+  const dashboard = [];
+  for (const idea of (ideas || [])) {
+    const { data: bids } = await supabase.from('bids')
+      .select('*').eq('idea_id', idea.id).order('performance_score', { ascending: false });
+
+    if (!bids || bids.length === 0) continue;
+
+    const winner = bids.find(b => b.status === 'Won');
+    const bidSummaries = [];
+
+    for (const bid of bids) {
+      const { data: bidder } = await supabase.from('users')
+        .select('full_name, avatar_url').eq('id', bid.user_id).single();
+
+      const daysVsExpected = bid.committed_date && idea.expected_delivery_date
+        ? Math.round((new Date(idea.expected_delivery_date) - new Date(bid.committed_date)) / (1000*60*60*24))
+        : 0;
+
+      bidSummaries.push({
+        id: bid.id,
+        bidder: bidder?.full_name || bid.bidder_name || 'Unknown',
+        bidderAvatar: bidder?.avatar_url,
+        mode: bid.bid_type,
+        score: bid.performance_score || 0,
+        committedDate: bid.committed_date,
+        daysVsExpected,
+        isWithinDeadline: daysVsExpected >= 0,
+        status: bid.status,
+        approach: bid.approach_note,
+        isWinner: bid.id === winner?.id,
+        isAutoAssigned: bid.is_auto_assigned || idea.auto_assigned
+      });
+    }
+
+    dashboard.push({
+      idea: {
+        id: idea.id,
+        title: idea.title,
+        status: idea.status,
+        size: idea.size,
+        complexity: idea.complexity,
+        projectType: idea.project_type,
+        cutoffDate: idea.bid_cutoff_date,
+        expectedDeliveryDate: idea.expected_delivery_date,
+        autoAssigned: idea.auto_assigned
+      },
+      totalBids: bids.length,
+      winner: winner ? bidSummaries.find(b => b.isWinner) : null,
+      bids: bidSummaries
+    });
+  }
+
+  // Algorithm explanation
+  const algorithm = {
+    name: 'BuildBoard Bid Ranking Algorithm',
+    version: '1.0',
+    factors: [
+      { name: 'On-time Delivery Rate', weight: '40%', description: 'Percentage of past ideas delivered on or before committed date' },
+      { name: 'Manager Rating Average', weight: '35%', description: 'Average of all past manager ratings (Poor=1, Average=3, Good=4, Excellent=5)' },
+      { name: 'Completion Rate', weight: '25%', description: 'Ratio of completed ideas to total ideas participated in' },
+      { name: 'Early Delivery Bonus', weight: '+2 pts/day', description: 'Up to +20 bonus for committing to deliver before deadline' },
+      { name: 'Late Commitment Penalty', weight: '-10 pts', description: 'Penalty for committing to deliver after expected deadline' },
+    ],
+    formula: 'Score = (OnTimeRate × 40) + (AvgRating/5 × 35) + (CompletionRate × 25) + DeliveryBonus',
+    newBuilderDefault: 50,
+    teamScoring: 'Average of all confirmed team member scores'
+  };
+
+  res.json({ dashboard, algorithm, totalIdeasWithBids: dashboard.length });
+});
+
 // GET /bids/mine — current user's bids
 router.get('/mine', authenticate, async (req, res) => {
   const { data: bids } = await supabase.from('bids')
