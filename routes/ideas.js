@@ -17,8 +17,20 @@ router.get('/', authenticate, async (req, res) => {
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
 
+  // Enrich with submitter names and emails
+  const submitterIds = [...new Set((data || []).map(i => i.submitted_by).filter(Boolean))];
+  let usersMap = {};
+  if (submitterIds.length > 0) {
+    const { data: usersData } = await supabase.from('users').select('id, name, email').in('id', submitterIds);
+    for (const u of (usersData || [])) usersMap[u.id] = { name: u.name, email: u.email };
+  }
+
   // Map to frontend shape
-  const ideas = (data || []).map(mapIdeaToResponse);
+  const ideas = (data || []).map(i => ({
+    ...mapIdeaToResponse(i),
+    submittedByName: usersMap[i.submitted_by]?.name || null,
+    submittedByEmail: usersMap[i.submitted_by]?.email || null,
+  }));
   res.json(ideas);
 });
 
@@ -125,7 +137,7 @@ router.post('/', authenticate, async (req, res) => {
 
 // PATCH /ideas/:id/approve
 router.patch('/:id/approve', authenticate, requireRole('Admin'), async (req, res) => {
-  const { size, complexity, bidCutoffDate, expectedDeliveryDate, estimatedHours, projectType, minHours, maxHours } = req.body;
+  const { size, complexity, bidCutoffDate, expectedDeliveryDate, estimatedHours, projectType, minHours, maxHours, projectOwner } = req.body;
 
   const { data: existing } = await supabase.from('ideas').select('submitted_by').eq('id', req.params.id).single();
   if (!existing) return res.status(404).json({ error: 'Idea not found' });
@@ -141,6 +153,7 @@ router.patch('/:id/approve', authenticate, requireRole('Admin'), async (req, res
     min_hours: minHours || null,
     max_hours: maxHours || null,
     ...(projectType !== undefined && { project_type: projectType }),
+    ...(projectOwner !== undefined && { project_owner_name: projectOwner }),
     updated_at: new Date().toISOString()
   }).eq('id', req.params.id).select().single();
 
