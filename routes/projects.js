@@ -4,8 +4,11 @@ const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /projects — list all active projects (ideas with InProgress or Completed status)
+// GET /projects — list projects the user is a member of (or all for Admin)
 router.get('/', authenticate, async (req, res) => {
+  const userId = req.user.userId;
+  const isAdmin = req.user.role === 'Admin';
+
   const { data: ideas } = await supabase.from('ideas')
     .select('*').in('status', ['InProgress', 'Completed', 'PendingReview'])
     .order('updated_at', { ascending: false });
@@ -15,6 +18,9 @@ router.get('/', authenticate, async (req, res) => {
     const { data: members } = await supabase.from('idea_members')
       .select('user_id, role').eq('idea_id', idea.id);
     const memberIds = (members || []).map(m => m.user_id);
+
+    // Only show projects where user is a member, project owner, or admin
+    if (!isAdmin && !memberIds.includes(userId) && idea.submitted_by !== userId) continue;
     const { data: users } = memberIds.length > 0
       ? await supabase.from('users').select('id, full_name, avatar_url').in('id', memberIds)
       : { data: [] };
