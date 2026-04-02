@@ -166,6 +166,28 @@ router.patch('/:id/reject', authenticate, requireRole('Admin'), async (req, res)
   res.json(mapIdeaToResponse(data));
 });
 
+// PATCH /ideas/:id/edit — admin edit idea details (dates, size, complexity, owner)
+router.patch('/:id/edit', authenticate, requireRole('Admin'), async (req, res) => {
+  const { size, complexity, bidCutoffDate, expectedDeliveryDate, estimatedHours, minHours, maxHours, projectOwner, projectType } = req.body;
+
+  const updates = { updated_at: new Date().toISOString() };
+  if (size !== undefined) updates.size = size;
+  if (complexity !== undefined) updates.complexity = complexity;
+  if (bidCutoffDate !== undefined) updates.bid_cutoff_date = bidCutoffDate;
+  if (expectedDeliveryDate !== undefined) updates.expected_delivery_date = expectedDeliveryDate;
+  if (estimatedHours !== undefined) updates.estimated_hours = estimatedHours;
+  if (minHours !== undefined) updates.min_hours = minHours;
+  if (maxHours !== undefined) updates.max_hours = maxHours;
+  if (projectOwner !== undefined) updates.project_owner_name = projectOwner;
+  if (projectType !== undefined) updates.project_type = projectType;
+
+  const { data, error } = await supabase.from('ideas')
+    .update(updates).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+
+  res.json(mapIdeaToResponse(data));
+});
+
 // PATCH /ideas/:id/complete
 router.patch('/:id/complete', authenticate, async (req, res) => {
   const { data, error } = await supabase.from('ideas').update({

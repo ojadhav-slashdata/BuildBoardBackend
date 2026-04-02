@@ -78,6 +78,34 @@ router.post('/:ideaId/bids', authenticate, async (req, res) => {
   res.status(201).json({ ...mapBidToResponse(bid), performanceScore: score, teamMembers: teamMembersList });
 });
 
+// PATCH /ideas/:ideaId/bids/:bidId — edit own bid
+router.patch('/:ideaId/bids/:bidId', authenticate, async (req, res) => {
+  const { committedDeliveryDate, approach } = req.body;
+  const userId = req.user.userId;
+
+  // Verify bid belongs to user
+  const { data: bid } = await supabase.from('bids')
+    .select('*').eq('id', req.params.bidId).single();
+  if (!bid) return res.status(404).json({ error: 'Bid not found' });
+  if (bid.user_id !== userId) return res.status(403).json({ error: 'You can only edit your own bids' });
+  if (bid.status !== 'Pending') return res.status(400).json({ error: 'Can only edit pending bids' });
+
+  const updates = {};
+  if (committedDeliveryDate !== undefined) updates.committed_date = committedDeliveryDate;
+  if (approach !== undefined) updates.approach_note = approach;
+
+  const { data, error } = await supabase.from('bids')
+    .update(updates).eq('id', req.params.bidId).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+
+  res.json({
+    _id: data.id, id: data.id, idea: data.idea_id, bidder: data.user_id,
+    bidderName: data.bidder_name, mode: data.bid_type,
+    committedDeliveryDate: data.committed_date, approach: data.approach_note,
+    status: data.status, createdAt: data.created_at,
+  });
+});
+
 // GET /ideas/:ideaId/bids — list all bids with real scores
 router.get('/:ideaId/bids', authenticate, async (req, res) => {
   const { data: bids } = await supabase.from('bids')
