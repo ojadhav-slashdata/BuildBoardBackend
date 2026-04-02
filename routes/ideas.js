@@ -117,6 +117,38 @@ router.post('/', authenticate, async (req, res) => {
   const { title, description, category, projectType, projectOwner, businessValue, resources, challenges, attachment, attachmentName } = req.body;
   const userId = req.user.userId;
 
+  // Upload attachment to Supabase Storage if provided as base64
+  let attachmentUrl = null;
+  let storedAttachmentName = attachmentName || null;
+  if (attachment && attachment.startsWith('data:')) {
+    try {
+      const matches = attachment.match(/^data:(.+);base64,(.+)$/);
+      if (matches) {
+        const mimeType = matches[1];
+        const base64Data = matches[2];
+        const buffer = Buffer.from(base64Data, 'base64');
+        const ext = attachmentName ? attachmentName.split('.').pop() : 'bin';
+        const filePath = `ideas/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('attachments')
+          .upload(filePath, buffer, { contentType: mimeType, upsert: false });
+
+        if (uploadError) {
+          console.error('[attachment] Upload failed:', uploadError.message);
+        } else {
+          const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
+          attachmentUrl = urlData.publicUrl;
+        }
+      }
+    } catch (err) {
+      console.error('[attachment] Processing failed:', err.message);
+    }
+  } else if (attachment) {
+    // Already a URL (not base64)
+    attachmentUrl = attachment;
+  }
+
   const { data: idea, error } = await supabase.from('ideas').insert({
     title,
     description,
@@ -127,8 +159,8 @@ router.post('/', authenticate, async (req, res) => {
     business_value: businessValue || null,
     resources: resources || null,
     challenges: challenges || null,
-    attachment_url: attachment || null,
-    attachment_name: attachmentName || null,
+    attachment_url: attachmentUrl,
+    attachment_name: storedAttachmentName,
     submitted_by: userId,
     status: 'PendingApproval',
     size: 'Micro',
