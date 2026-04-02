@@ -111,7 +111,8 @@ router.get('/mine', authenticate, async (req, res) => {
       approach: bid.approach_note,
       status: bid.status,
       confirmationStatus: 'Confirmed',
-      createdAt: bid.created_at
+      createdAt: bid.created_at,
+      rejectionReason: bid.rejection_reason || null,
     });
   }
 
@@ -126,9 +127,24 @@ router.patch('/:id/assign', authenticate, requireRole('Admin'), async (req, res)
   // Mark this bid as Won
   await supabase.from('bids').update({ status: 'Won' }).eq('id', req.params.id);
 
-  // Mark other bids as Not Selected
-  await supabase.from('bids').update({ status: 'Not Selected' })
+  // Mark others as Not Selected with reason
+  const { data: losingBids } = await supabase.from('bids')
+    .select('id, user_id, performance_score, committed_date')
     .eq('idea_id', bid.idea_id).neq('id', req.params.id);
+
+  // Fetch idea details needed for rejection reason (also used later for notifications)
+  const { data: idea } = await supabase.from('ideas').select('expected_delivery_date, title').eq('id', bid.idea_id).single();
+
+  for (const lb of (losingBids || [])) {
+    let reason = 'Another bid scored higher overall.';
+    if (bid.performance_score && lb.performance_score && bid.performance_score > lb.performance_score) {
+      reason = `Winner had a higher performance score (${bid.performance_score} vs your ${lb.performance_score}).`;
+    }
+    if (lb.committed_date && idea?.expected_delivery_date && new Date(lb.committed_date) > new Date(idea.expected_delivery_date)) {
+      reason += ' Your committed delivery date exceeded the expected deadline.';
+    }
+    await supabase.from('bids').update({ status: 'Not Selected', rejection_reason: reason }).eq('id', lb.id);
+  }
 
   // Update idea to InProgress
   await supabase.from('ideas').update({
@@ -153,8 +169,6 @@ router.patch('/:id/assign', authenticate, requireRole('Admin'), async (req, res)
       idea_id: bid.idea_id, user_id: memberId, role: 'contributor'
     });
   }
-
-  const { data: idea } = await supabase.from('ideas').select('title').eq('id', bid.idea_id).single();
 
   // Notify winner
   await notify(bid.user_id, 'You Won the Bid!', `Your bid on "${idea?.title || 'an idea'}" has been selected. Time to build!`, 'assignment', bid.idea_id);
