@@ -21,8 +21,8 @@ router.get('/', authenticate, async (req, res) => {
   const submitterIds = [...new Set((data || []).map(i => i.submitted_by).filter(Boolean))];
   let usersMap = {};
   if (submitterIds.length > 0) {
-    const { data: usersData } = await supabase.from('users').select('id, name, email').in('id', submitterIds);
-    for (const u of (usersData || [])) usersMap[u.id] = { name: u.name, email: u.email };
+    const { data: usersData } = await supabase.from('users').select('id, full_name, email').in('id', submitterIds);
+    for (const u of (usersData || [])) usersMap[u.id] = { name: u.full_name, email: u.email };
   }
 
   // Map to frontend shape
