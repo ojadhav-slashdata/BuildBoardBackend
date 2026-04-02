@@ -15,6 +15,7 @@ const usersRoutes = require('./routes/users');
 const analyticsRoutes = require('./routes/analytics');
 const pointsRoutes = require('./routes/points');
 const rewardsRoutes = require('./routes/rewards');
+const projectsRoutes = require('./routes/projects');
 
 const { runMigrations, getMigrationSQL } = require('./migrate');
 
@@ -49,6 +50,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api', pointsRoutes);
 app.use('/api/rewards', rewardsRoutes);
 app.use('/api/bids', require('./routes/bidActions'));
+app.use('/api/projects', projectsRoutes);
 
 const swaggerOptions = {
   customCssUrl: 'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css',
