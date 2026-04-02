@@ -6,11 +6,13 @@ const router = express.Router();
 
 // GET /bids/dashboard — Manager's bid dashboard across all ideas
 router.get('/dashboard', authenticate, requireRole('Manager', 'Admin'), async (req, res) => {
+  try {
   // Get all ideas that have bids or are in bidding
-  const { data: ideas } = await supabase.from('ideas')
+  const { data: ideas, error: ideasErr } = await supabase.from('ideas')
     .select('*')
     .in('status', ['BiddingOpen', 'BiddingClosed', 'InProgress', 'Completed'])
     .order('updated_at', { ascending: false });
+  if (ideasErr) return res.status(500).json({ error: ideasErr.message });
 
   const dashboard = [];
   for (const idea of (ideas || [])) {
@@ -81,6 +83,10 @@ router.get('/dashboard', authenticate, requireRole('Manager', 'Admin'), async (r
   };
 
   res.json({ dashboard, algorithm, totalIdeasWithBids: dashboard.length });
+  } catch (err) {
+    console.error('Dashboard error:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
+  }
 });
 
 // GET /bids/mine — current user's bids
