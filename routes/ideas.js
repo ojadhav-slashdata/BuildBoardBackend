@@ -254,6 +254,30 @@ router.patch('/:id/complete', authenticate, async (req, res) => {
   res.json(mapIdeaToResponse(data));
 });
 
+// DELETE /ideas/:id — admin delete idea and all related data
+router.delete('/:id', authenticate, requireRole('Admin'), async (req, res) => {
+  const ideaId = req.params.id;
+
+  // Delete related data first (foreign key order)
+  await supabase.from('notifications').delete().eq('idea_id', ideaId);
+  await supabase.from('feedbacks').delete().eq('idea_id', ideaId);
+  await supabase.from('comments').delete().eq('idea_id', ideaId);
+  await supabase.from('time_logs').delete().eq('idea_id', ideaId);
+  await supabase.from('idea_members').delete().eq('idea_id', ideaId);
+  await supabase.from('point_batches').delete().eq('idea_id', ideaId);
+  await supabase.from('project_tasks').delete().eq('idea_id', ideaId);
+  await supabase.from('project_messages').delete().eq('idea_id', ideaId);
+  await supabase.from('project_links').delete().eq('idea_id', ideaId);
+  await supabase.from('project_requirements').delete().eq('idea_id', ideaId);
+  await supabase.from('extension_requests').delete().eq('idea_id', ideaId);
+  await supabase.from('bids').delete().eq('idea_id', ideaId);
+
+  const { error } = await supabase.from('ideas').delete().eq('id', ideaId);
+  if (error) return res.status(500).json({ error: error.message });
+
+  res.json({ message: 'Idea deleted successfully' });
+});
+
 // Helper: map DB idea to FE response shape
 function mapIdeaToResponse(idea) {
   return {
