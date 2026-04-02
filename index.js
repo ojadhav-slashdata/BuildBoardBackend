@@ -24,7 +24,7 @@ const { runMigrations, getMigrationSQL } = require('./migrate');
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '4mb' }));
 
 // Run migrations on startup
 runMigrations().catch(err => console.error('[migrate] Failed:', err.message));
