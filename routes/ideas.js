@@ -94,8 +94,17 @@ router.get('/:id', authenticate, async (req, res) => {
     comment: f.comment
   }));
 
+  // Get submitter info
+  let submittedByName = null, submittedByEmail = null;
+  if (idea.submitted_by) {
+    const { data: submitter } = await supabase.from('users').select('full_name, email').eq('id', idea.submitted_by).single();
+    if (submitter) { submittedByName = submitter.full_name; submittedByEmail = submitter.email; }
+  }
+
   res.json({
     ...mapIdeaToResponse(idea),
+    submittedByName,
+    submittedByEmail,
     timeLogs,
     comments,
     teamMembers,
