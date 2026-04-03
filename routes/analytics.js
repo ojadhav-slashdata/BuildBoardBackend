@@ -23,7 +23,7 @@ router.get('/dashboard', authenticate, async (req, res) => {
   const { data: timeLogs } = await supabase.from('time_logs').select('hours, created_at');
   const { data: members } = await supabase.from('idea_members').select('user_id');
   const { data: users } = await supabase.from('users')
-    .select('id, full_name, total_points').order('total_points', { ascending: false });
+    .select('id, full_name, total_points, avatar_url').order('total_points', { ascending: false });
 
   const allIdeas = ideas || [];
   const completed = allIdeas.filter(i => i.status === 'Completed');
@@ -89,7 +89,7 @@ router.get('/dashboard', authenticate, async (req, res) => {
     soloBids: allBids.filter(b => b.bid_type === 'solo').length,
     earlyDeliveries: early.length,
     lateDeliveries: late.length,
-    leaderboard: (users || []).slice(0, 10).map(u => ({ name: u.full_name, points: u.total_points }))
+    leaderboard: (users || []).slice(0, 10).map(u => ({ name: u.full_name, points: u.total_points, avatar: u.avatar_url, id: u.id }))
   });
 });
 
