@@ -13,7 +13,7 @@ router.post('/enhance-description', authenticate, async (req, res) => {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
     const prompt = `You are an innovation consultant helping employees write compelling idea submissions for an internal innovation platform called BuildBoard.
 
