@@ -120,15 +120,20 @@ router.get('/:id', authenticate, async (req, res) => {
 
   const totalHours = (timeLogs || []).reduce((s, l) => s + l.hours, 0);
 
+  // Get winning bid user
+  const { data: winningBid } = await supabase.from('bids')
+    .select('user_id, lead_user_id').eq('idea_id', ideaId).in('status', ['Won', 'assigned']).limit(1).single();
+  const bidWinnerId = winningBid?.lead_user_id || winningBid?.user_id || null;
+
   res.json({
-    project: {
-      id: idea.id, title: idea.title, description: idea.description,
-      status: idea.status, size: idea.size, complexity: idea.complexity,
-      projectType: idea.project_type, projectOwner: idea.project_owner_name,
-      expectedDelivery: idea.expected_delivery_date, completedAt: idea.completed_at,
-      estimatedHours: idea.estimated_hours || idea.max_hours,
-      totalHours, category: idea.category,
-    },
+    id: idea.id, title: idea.title, name: idea.title, description: idea.description,
+    status: idea.status, size: idea.size, complexity: idea.complexity,
+    projectType: idea.project_type, projectOwner: idea.project_owner_name,
+    expectedDeliveryDate: idea.expected_delivery_date, completedAt: idea.completed_at,
+    estimatedHours: idea.estimated_hours || idea.max_hours,
+    totalHoursLogged: totalHours, category: idea.category,
+    bidWinnerId,
+    submittedBy: idea.submitted_by,
     members: memberList,
     tasks: taskList,
     messages: msgList,
