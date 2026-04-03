@@ -1,7 +1,7 @@
 const express = require('express');
 const supabase = require('../db');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { awardIdeaSubmissionPoints } = require('../services/points');
+const { awardIdeaSubmissionPoints, awardPoints } = require('../services/points');
 const { notify } = require('../services/notify');
 
 const router = express.Router();
@@ -242,8 +242,33 @@ router.patch('/:id/edit', authenticate, requireRole('Admin'), async (req, res) =
   res.json(mapIdeaToResponse(data));
 });
 
-// PATCH /ideas/:id/complete
+// PATCH /ideas/:id/send-for-review
+router.patch('/:id/send-for-review', authenticate, async (req, res) => {
+  const { data: existing } = await supabase.from('ideas').select('status, submitted_by, title').eq('id', req.params.id).single();
+  if (!existing) return res.status(404).json({ error: 'Idea not found' });
+  if (existing.status !== 'InProgress') return res.status(400).json({ error: 'Only InProgress ideas can be sent for review' });
+
+  const { data, error } = await supabase.from('ideas').update({
+    status: 'PendingReview',
+    updated_at: new Date().toISOString()
+  }).eq('id', req.params.id).select().single();
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Notify admin
+  const { data: admins } = await supabase.from('users').select('id').in('role', ['Admin', 'admin']);
+  for (const admin of (admins || [])) {
+    await notify(admin.id, 'Project ready for review', `"${existing.title}" has been submitted for review.`, 'info', req.params.id);
+  }
+
+  res.json(mapIdeaToResponse(data));
+});
+
+// PATCH /ideas/:id/complete — mark as completed and award points
 router.patch('/:id/complete', authenticate, async (req, res) => {
+  const { data: existing } = await supabase.from('ideas').select('status').eq('id', req.params.id).single();
+  if (!existing) return res.status(404).json({ error: 'Idea not found' });
+
   const { data, error } = await supabase.from('ideas').update({
     status: 'Completed',
     completed_at: new Date().toISOString(),
@@ -251,6 +276,19 @@ router.patch('/:id/complete', authenticate, async (req, res) => {
   }).eq('id', req.params.id).select().single();
 
   if (error) return res.status(500).json({ error: error.message });
+
+  // Award points to bid winner and team members
+  try {
+    await awardPoints(req.params.id, 'Good');
+    // Notify team members
+    const { data: members } = await supabase.from('idea_members').select('user_id').eq('idea_id', req.params.id);
+    for (const m of (members || [])) {
+      await notify(m.user_id, 'Project Completed!', `"${data.title}" has been marked as completed. Points have been awarded!`, 'approval', req.params.id);
+    }
+  } catch (err) {
+    console.error('[complete] Points award failed:', err.message);
+  }
+
   res.json(mapIdeaToResponse(data));
 });
 
